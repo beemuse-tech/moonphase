@@ -378,7 +378,7 @@ function frame(now){
   const k = 1 - Math.exp(-dt * 6);
   for (const key of ['th','ph','dist','tx','ty','tz']) cur[key] += (goal[key] - cur[key]) * (drag && !drag.moon && (key === 'th' || key === 'ph') ? 1 : k);
   cam.position.set(cur.tx + cur.dist * Math.sin(cur.ph) * Math.cos(cur.th), cur.ty + cur.dist * Math.cos(cur.ph), cur.tz + cur.dist * Math.sin(cur.ph) * Math.sin(cur.th));
-  cam.up.set(0, 1, 0); if (cur.ph < 0.02) cam.up.set(-1, 0, 0);
+  cam.up.set(0, 1, 0); if (cur.ph < 0.02) cam.up.set(0, 0, -1);
   cam.lookAt(cur.tx, cur.ty, cur.tz);
   for (const key in labels){ const s = labels[key]; s.scale.set(3.2 * s.userData.k * cam.position.distanceTo(s.position) / 1, 1.2 * s.userData.k * cam.position.distanceTo(s.position), 1); }
   resize();
