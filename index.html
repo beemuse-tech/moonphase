@@ -31,7 +31,7 @@
   .note{flex:1 1 14em}
   .sw{flex:1 1 16em}
   .row label{font-size:13px;color:var(--dim);white-space:nowrap;min-width:5.5em}
-  .row .val{font-size:13px;min-width:9.5em;text-align:right;white-space:nowrap}
+  .row .val{font-size:13px;min-width:5.5em;text-align:right;white-space:nowrap}
   input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
   button{font:inherit;font-size:12.5px;color:var(--text);background:#1a2140;border:1px solid #2c3664;border-radius:8px;
     padding:6px 10px;cursor:pointer}
@@ -41,16 +41,25 @@
   .presets span{font-size:13px;color:var(--dim);margin-right:2px}
   input[type=date]{font:inherit;font-size:13px;color:var(--text);background:#1a2140;border:1px solid #2c3664;border-radius:8px;padding:4px 8px;color-scheme:dark}
   .note{font-size:11.5px;color:var(--dim);line-height:1.5}
-  .sw{flex:1;min-width:0;position:relative;padding-bottom:17px}
+  .sw{flex:1;min-width:0;position:relative;padding-bottom:52px}
   .sw input{width:100%;display:block;margin:0}
-  .ticks{position:absolute;left:0;right:0;bottom:0;height:14px;pointer-events:none}
-  .ticks span{position:absolute;left:calc(12px + (100% - 24px) * var(--f));transform:translateX(-50%);font-size:10.5px;color:var(--dim);white-space:nowrap;opacity:.8}
+  .ticks{position:absolute;left:0;right:0;bottom:0;height:46px;pointer-events:none}
+  .ticks button{position:absolute;left:calc(12px + (100% - 24px) * var(--f));transform:translateX(-50%);pointer-events:auto;top:0;
+    display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;border-radius:8px;padding:2px 4px;min-height:0;
+    font-size:10.5px;color:var(--dim);white-space:nowrap;cursor:pointer}
+  .ticks button:hover{background:#1a2140;color:var(--text)}
+  .ticks svg{width:22px;height:22px;display:block;border-radius:50%;box-shadow:0 0 0 1px #2c3664}
+  .ticks button.on{color:var(--accent);background:none}
+  .ticks button.on svg{box-shadow:0 0 0 2px var(--accent)}
+  .ticks .lb{height:12px;line-height:12px}
   .ticks i{font-style:normal;opacity:.6}
   #sav b{font-weight:600;color:var(--accent)}
   #sav small{font-size:12px;color:var(--dim);margin-left:.4em}
   .chk{font-size:12.5px;color:var(--dim);display:flex;align-items:center;gap:4px;cursor:pointer}
   @media (pointer:coarse){
     button{min-height:44px;padding:8px 14px;font-size:14px}
+    .ticks button{min-height:0;padding:3px 4px;font-size:11px}
+    .ticks svg{width:24px;height:24px}
     input[type=range]{height:44px}
     input[type=date]{min-height:44px;font-size:15px}
     .chk{font-size:14px;min-height:44px}
@@ -96,16 +105,12 @@
       <span class="note">日付を選ぶと、その日の月の形になります（平均の周期で計算するので、実際より最大で半日ほどずれます）</span></div>
     <div class="row"><label for="sa">月の位置</label>
       <div class="sw"><input id="sa" type="range" min="0" max="359.9" step="0.1" value="90">
-        <div class="ticks"><span style="--f:0">新月</span><span style="--f:.25">上弦 <i>7日</i></span><span style="--f:.5">満月 <i>15日</i></span><span style="--f:.75">下弦 <i>22日</i></span><span style="--f:1">新月</span></div></div>
+        <div class="ticks" id="ticks"></div></div>
       <span class="val" id="sav"></span></div>
     <div class="presets">
-      <span>月の位置：</span>
-      <button data-a="0">新月</button><button data-a="45">三日月</button><button data-a="90">上弦</button>
-      <button data-a="135">満ちていく</button><button data-a="180">満月</button><button data-a="225">欠けていく</button>
-      <button data-a="270">下弦</button><button data-a="315">細い月</button>
       <button id="play">▶ 月を動かす</button>
       <label class="chk"><input type="checkbox" id="rays" checked>太陽の光の線</label>
-      
+      <button id="share" title="いまの月の位置と視点で開くURLをコピーします">この状態のURLをコピー</button><span class="note" id="sharemsg"></span>
     </div>
   </div>
 </div>
@@ -114,6 +119,7 @@
 (() => {
 const $ = id => document.getElementById(id);
 const EARTH_R = 1.5, ORBIT = 8, MOON_R = 0.6, SUN_D = 26, SUN_R = 3;
+// 見やすい図 と 実際の縮尺（地球の半径 = 1.5 としたときの、月までの距離・月と太陽の大きさ・太陽までの距離）
 const LAT = 35.0 * Math.PI / 180, LON = 135.9 * Math.PI / 180;   // 滋賀県（大津市のあたり）
 const state = { a: Math.PI / 2, playing: false, t: Date.now() };
 const SYN = 29.530588, REF = Date.UTC(2000, 0, 6, 18, 14), DAY = 86400000;
@@ -185,13 +191,14 @@ const godCanvas = $('god');
 const gr = new THREE.WebGLRenderer({ canvas: godCanvas, antialias: true });
 gr.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x03050c);
-const cam = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
+const cam = new THREE.PerspectiveCamera(42, 1, 0.2, 200000);
 
-// 星
+// 星（カメラについてくる）
+let starsPts;
 { const p = [], r = rng(11);
   for (let i = 0; i < 700; i++){ const u = r() * 2 - 1, a = r() * 6.28, s = Math.sqrt(1 - u * u), d = 150 + r() * 30; p.push(Math.cos(a) * s * d, u * d, Math.sin(a) * s * d); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, sizeAttenuation: false, opacity: .7, transparent: true }))); }
+  starsPts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, sizeAttenuation: false, opacity: .7, transparent: true })); starsPts.frustumCulled = false; scene.add(starsPts); }
 
 const sunLight = new THREE.DirectionalLight(0xfff4e0, 1.35); sunLight.position.set(SUN_D, 0, 0); scene.add(sunLight);
 scene.add(new THREE.AmbientLight(0x6a7aa8, 0.16));
@@ -334,7 +341,7 @@ function update(fromDate){
   earthGroup.rotation.y = th;
   const pdir = V(Math.cos(LAT) * Math.cos(a), Math.sin(LAT), -Math.cos(LAT) * Math.sin(a));
   const ppos = pdir.clone().multiplyScalar(EARTH_R);
-  raysGroup.visible = $('rays').checked; moonRay.visible = $('rays').checked;
+  raysGroup.visible = moonRay.visible = $('rays').checked;
   { const pa = moonRay.geometry.attributes.position;
     pa.setXYZ(0, SUN_D - SUN_R - .3, mpos.y, mpos.z); pa.setXYZ(1, mpos.x + MOON_R * 1.1, mpos.y, mpos.z); pa.needsUpdate = true; moonRay.computeLineDistances(); }
   { const pa = sight.geometry.attributes.position;
@@ -364,20 +371,23 @@ function update(fromDate){
   $('lit').textContent = Math.round(lit * 100) + '%';
   $('age').textContent = (deg / 360 * 29.53).toFixed(1) + ' 日';
   $('explain').textContent = explain(deg);
-  $('sav').innerHTML = `月齢 <b>${(deg / 360 * SYN).toFixed(1)}</b><small>${phaseName(deg).replace(/（.*）/, '')}</small>`;
+  $('sav').innerHTML = `月齢 <b>${(deg / 360 * SYN).toFixed(1)}</b>`;
   $('sa').value = deg;
-  document.querySelectorAll('.presets button[data-a]').forEach(b => {
+  document.querySelectorAll('.ticks button[data-a]').forEach(b => {
     const d = Math.abs(((+b.dataset.a - deg + 540) % 360) - 180); b.classList.toggle('on', d < 3); });
 }
 
 /* ---------- カメラ操作 ---------- */
 const views = {
   all:   { th: 0.85, ph: 0.95, dist: 46, tx: 13, ty: 0, tz: 0 },
-  top:   { th: 0.0001, ph: 0.001, dist: 44, tx: 13, ty: 0, tz: 0 },
+  top:   { th: Math.PI / 2, ph: 0.002, dist: 44, tx: 13, ty: 0, tz: 0 },
   earth: { th: 0.7, ph: 1.0, dist: 17, tx: 0, ty: 0, tz: 0 }
 };
 const cur = { ...views.all }, goal = { ...views.all };
-function setView(n){ Object.assign(goal, views[n]); document.querySelectorAll('#views button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === n)); }
+const maxDist = () => 90;
+let curView = 'all';
+function setView(n){ curView = n; Object.assign(goal, views[n]); goal.th += Math.PI * 2 * Math.round((cur.th - goal.th) / (Math.PI * 2));   // いちばん近い回り方で動かす
+  document.querySelectorAll('#views button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === n)); update(true); }
 document.querySelectorAll('#views button[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view));
 
 let drag = null;
@@ -409,7 +419,7 @@ godCanvas.addEventListener('pointermove', e => {
   if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pinch && ptrs.size >= 2){
     const t = twoFingers();
-    goal.dist = clamp(pinch.dist * pinch.d / Math.max(t.d, 1), 6, 90); cur.dist = goal.dist;
+    goal.dist = clamp(pinch.dist * pinch.d / Math.max(t.d, 1), 6, maxDist()); cur.dist = goal.dist;
     goal.th -= (t.ang - pinch.ang); cur.th = goal.th; pinch.ang = t.ang;
     document.querySelectorAll('#views button').forEach(b => b.classList.remove('on'));
     return;
@@ -436,13 +446,13 @@ const endDrag = e => {
 godCanvas.addEventListener('pointerup', endDrag); godCanvas.addEventListener('pointercancel', endDrag);
 for (const ev of ['gesturestart', 'gesturechange']) godCanvas.addEventListener(ev, e => e.preventDefault());   // Safari の拡大を止める
 godCanvas.addEventListener('dblclick', e => setView('all'));
-godCanvas.addEventListener('wheel', e => { e.preventDefault(); goal.dist = clamp(goal.dist * Math.exp(e.deltaY * 0.001), 6, 90); }, { passive: false });
+godCanvas.addEventListener('wheel', e => { e.preventDefault(); goal.dist = clamp(goal.dist * Math.exp(e.deltaY * 0.001), 6, maxDist()); }, { passive: false });
 
 /* ---------- 操作パネル ---------- */
 $('sa').oninput = e => { state.a = +e.target.value * D2R; update(); };
-document.querySelectorAll('.presets button[data-a]').forEach(b => b.onclick = () => { state.a = +b.dataset.a * D2R; update(); });
-$('zin').onclick = () => { goal.dist = clamp(goal.dist * 0.75, 6, 90); };
-$('zout').onclick = () => { goal.dist = clamp(goal.dist / 0.75, 6, 90); };
+document.querySelectorAll('.ticks button[data-a]').forEach(b => b.onclick = () => { state.a = +b.dataset.a * D2R; update(); });
+$('zin').onclick = () => { goal.dist = clamp(goal.dist * 0.75, 6, maxDist()); };
+$('zout').onclick = () => { goal.dist = clamp(goal.dist / 0.75, 6, maxDist()); };
 $('rays').onchange = () => update(true);
 $('dt').onchange = e => { if (e.target.value){ const [y, m, d] = e.target.value.split('-').map(Number); setDate(new Date(y, m - 1, d, 12).getTime()); } };
 $('today').onclick = () => setDate(Date.now());
@@ -464,14 +474,51 @@ function frame(now){
   const k = 1 - Math.exp(-dt * 6);
   for (const key of ['th','ph','dist','tx','ty','tz']) cur[key] += (goal[key] - cur[key]) * (drag && !drag.moon && (key === 'th' || key === 'ph') ? 1 : k);
   cam.position.set(cur.tx + cur.dist * Math.sin(cur.ph) * Math.cos(cur.th), cur.ty + cur.dist * Math.cos(cur.ph), cur.tz + cur.dist * Math.sin(cur.ph) * Math.sin(cur.th));
-  cam.up.set(0, 1, 0); if (cur.ph < 0.02) cam.up.set(0, 0, -1);
+  cam.up.set(0, 1, 0);
   cam.lookAt(cur.tx, cur.ty, cur.tz);
   for (const key in labels){ const s = labels[key]; s.scale.set(3.2 * s.userData.k * cam.position.distanceTo(s.position) / 1, 1.2 * s.userData.k * cam.position.distanceTo(s.position), 1); }
   resize();
+  starsPts.position.copy(cam.position);
   gr.render(scene, cam); orr.render(scene2, cam2);
   requestAnimationFrame(frame);
 }
-setView('all'); resize(); setDate(Date.now()); requestAnimationFrame(frame);
+/* ---------- 月の形の目盛り ---------- */
+function phaseSVG(deg){
+  let a = ((deg % 360) + 360) % 360; const waning = a > 180; if (waning) a = 360 - a;
+  const rx = Math.abs(Math.cos(a * D2R)) * 11, sw = a < 90 ? 0 : 1;
+  const path = `<path d="M11 0A11 11 0 0 1 11 22A${rx.toFixed(2)} 11 0 0 ${sw} 11 0Z" fill="#f2edd6"/>`;
+  return `<svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#20263f"/>${waning ? `<g transform="translate(22 0) scale(-1 1)">${path}</g>` : path}</svg>`;
+}
+{ const names = { 0: '新月', 45: '三日月', 90: '上弦 <i>7日</i>', 180: '満月 <i>15日</i>', 270: '下弦 <i>22日</i>', 360: '新月' };
+  const titles = { 45: '三日月', 135: '満ちていく月', 225: '欠けていく月', 315: '細い月' };
+  $('ticks').innerHTML = [0, 45, 90, 135, 180, 225, 270, 315, 360].map(d =>
+    `<button data-a="${d % 360}" style="--f:${d / 360}" ${titles[d] ? `title="${titles[d]}"` : ''}>${phaseSVG(d)}<span class="lb">${names[d] || ''}</span></button>`).join('');
+  document.querySelectorAll('.ticks button[data-a]').forEach(b => b.onclick = () => { state.a = +b.dataset.a * D2R; update(); });
+}
+
+/* ---------- URL で開き方を決める ----------
+   例）?a=90 …上弦　?phase=満月　?date=2026-10-26　?view=top　&play=1（月を動かしながら開く）　&rays=0（光の線を消す） */
+const PHASES = { new: 0, '新月': 0, crescent: 45, '三日月': 45, first: 90, '上弦': 90, gibbous: 135, full: 180, '満月': 180,
+  waning: 225, last: 270, '下弦': 270, thin: 315 };
+
+$('share').onclick = async () => {
+  const deg = Math.round(((state.a / D2R) % 360 + 360) % 360);
+  const url = `${location.origin === 'null' ? location.href.split('?')[0] : location.origin + location.pathname}?a=${deg}${curView !== 'all' ? '&view=' + curView : ''}`;
+  let ok = false;
+  try { await navigator.clipboard.writeText(url); ok = true; } catch (e) { ok = false; }
+  if (!ok) window.prompt('このURLをコピーしてください', url);
+  $('sharemsg').textContent = ok ? 'コピーしました' : ''; setTimeout(() => $('sharemsg').textContent = '', 2500);
+};
+setView('all'); resize();
+{ const q = new URLSearchParams(location.search), qa = q.get('a'), qp = q.get('phase');
+  if (q.get('rays') === '0') $('rays').checked = false;
+  if (q.get('view') && views[q.get('view')]) { setView(q.get('view')); Object.assign(cur, views[q.get('view')]); }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(q.get('date') || '')){ const [y, m, d] = q.get('date').split('-').map(Number); setDate(new Date(y, m - 1, d, 12).getTime()); }
+  else if (qa !== null && !isNaN(+qa)){ state.a = (((+qa) % 360) + 360) % 360 * D2R; update(); }
+  else if (qp in PHASES){ state.a = PHASES[qp] * D2R; update(); }
+  else setDate(Date.now());
+  if (q.get('play') === '1') $('play').click(); }
+requestAnimationFrame(frame);
 window.__moon = { state, update };
 })();
 </script>
